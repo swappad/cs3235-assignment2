@@ -26,7 +26,7 @@ void bof(FILE * fd1, FILE * fd2)
 	}
 
 	printf("Buffer starts at: %p\n", buf);
-	printf("idx1, idx2, idx, byte_read2 starts at: %p\n%p\n%p\n%p\n", &idx1, &idx2, &idx, &byte_read2);
+//	printf("idx1, idx2, idx, byte_read2 starts at: %p\n%p\n%p\n%p\n", &idx1, &idx2, &idx, &byte_read2);
 	for(idx = 0; idx < byte_read1 + byte_read2; idx++)
 	{
 		idx1 = (idx % 2) ? BUFSIZE - 1 : idx / 2;
