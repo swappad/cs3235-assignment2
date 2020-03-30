@@ -7,6 +7,8 @@
 \usepackage{enumitem}
 \usepackage{float}
 \usepackage{multirow}
+\usepackage{listings}
+\usepackage[binary-units=true]{siunitx}
 
 \oddsidemargin=0.15in
 \evensidemargin=0.15in
@@ -38,6 +40,10 @@
 }
 
 \newcommand{\header}[3]{\handout{NUS CS-3235: Computer Security}{\today}{Lecturer: Reza Shokri}{Student: #2\quad#3}{#1}}
+\lstset{
+	language=bash,
+	basicstyle=\ttfamily \small\
+}
 
 %======================================
 %======================================
@@ -67,14 +73,14 @@ The following mapping can be observed: (Table \ref{stack})
 	\begin{tabular}{c|cccc}
 		\textbf{Variable} & \textbf{Address} & \textbf{Length} & \textbf{Index \textit{(rel. to buf)}} & \textbf{Preferred value} \\
 		\hline
-		\texttt{buf[0]} & \texttt{0x7fffffffe190} & $1B$ & $0$ & \multirow{2}{*}{shellcode}\\
-		\texttt{buf[63]} & \texttt{0x7fffffffe1cf} & $1B$ & $63$ & \\
-		\texttt{byte\_read2} & \texttt{0x7fffffffe1e4} & $4B$ & $84-87$ &$40_h = 64$ \\
-		\texttt{byte\_read1} & \texttt{0x7fffffffe1e8} & $4B$ & $88-91$ &$40_h = 64$ \\
-		\texttt{idx} & \texttt{0x7fffffffe1ec} & $4B$ & $92-95$ & 92\\
-		\texttt{idx2} & \texttt{0x7fffffffe1dc} & $4B$ & $76-79$ & don't care\\
-		\texttt{idx1} & \texttt{0x7fffffffe1e0} & $4B$ & $80-83$ & don't care\\
-		\texttt{return} & \texttt{0x7fffffffe1f8} & $8B$ & $104-111$ & \texttt{0x7fffffffe210} \\
+		\texttt{buf[0]} & \texttt{0x7fffffffe190} & $1\si{\byte}$ & $0$ & \multirow{2}{*}{shellcode}\\
+		\texttt{buf[63]} & \texttt{0x7fffffffe1cf} & $1\si{\byte}$ & $63$ & \\
+		\texttt{byte\_read2} & \texttt{0x7fffffffe1e4} & $4\si{\byte}$ & $84-87$ &$40_h = 64$ \\
+		\texttt{byte\_read1} & \texttt{0x7fffffffe1e8} & $4\si{\byte}$ & $88-91$ &$40_h = 64$ \\
+		\texttt{idx} & \texttt{0x7fffffffe1ec} & $4\si{\byte}$ & $92-95$ & 92\\
+		\texttt{idx2} & \texttt{0x7fffffffe1dc} & $4\si{\byte}$ & $76-79$ & don't care\\
+		\texttt{idx1} & \texttt{0x7fffffffe1e0} & $4\si{\byte}$ & $80-83$ & don't care\\
+		\texttt{return} & \texttt{0x7fffffffe1f8} & $8\si{\byte}$ & $104-111$ & \texttt{0x7fffffffe210} \\
 	\end{tabular}
 	\caption{Variable locations on the stack}
 	\label{stack}
@@ -89,8 +95,20 @@ I came up with a short python script \texttt{buf\_gen.py}, which generates a str
 
 \newpage
 \section{Format String Attack}
-In the program \texttt{format\_string.c} line $14$ an unfiltered input string (stored in the buffer \texttt{buf}) is used as first parameter for the format string function \texttt{printf()}.
-Therefore if the buffer respectively the input string contains of format string modifiers such as \texttt{\%n, \%p, \dots} the function will search for more parameters stored in the registers (Argument 0-7) and on the stack (7-n) and format them as specified. 
+In the program \texttt{format\_string.c} line $14$ an unfiltered input string (stored in the buffer \texttt{buf}) is used as first argument for the format string function \texttt{printf()}.
+Therefore if the buffer respectively the input string contains of format string modifiers such as \texttt{\%n, \%p, \dots} the function will search for more arguments stored in the registers (argument $0-7$) and on the stack (argument $7-n$) and format them as specified. 
+
+The input string will be generated and stored in a file by a single command such as:
+\begin{lstlisting}
+echo -ne '%4919c%8$nAAAAAA\x1c\x50\x75\x55\x55\x55\x00\x00' > payload
+\end{lstlisting}
+The string above will be interpreted as follows:
+\begin{itemize}
+	\item[\texttt{\%4919c\%} :] prints $4919 = 0x1337$ characters to \texttt{stdout}, used to set the internal output counter to this value.
+	\item[\texttt{\%8\$n} :] accesses the 8th argument with respect to the printf and write the number of bytes already printed to the adress provided.
+	\item[\texttt{AAAAAA} :] padding A's to align the following pointer address to a $8\si{\byte}$ stack entry
+	\item[Rest:] address of \texttt{jackpot} in little endian byte order
+\end{itemize}
 
 
 
