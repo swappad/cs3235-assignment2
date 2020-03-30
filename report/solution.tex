@@ -89,7 +89,8 @@ I came up with a short python script \texttt{buf\_gen.py}, which generates a str
 
 \newpage
 \section{Format String Attack}
-
+In the program \texttt{format\_string.c} line $14$ an unfiltered input string (stored in the buffer \texttt{buf}) is used as first parameter for the format string function \texttt{printf()}.
+Therefore if the buffer respectively the input string contains of format string modifiers such as \texttt{\%n, \%p, \dots} the function will search for more parameters stored in the registers (Argument 0-7) and on the stack (7-n) and format them as specified. 
 
 
 
