@@ -1,0 +1,104 @@
+\documentclass[12pt]{article}
+\renewcommand{\baselinestretch}{1.5}
+\usepackage[OT4]{fontenc}
+\newtheorem{define}{Definition}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{multirow}
+
+\oddsidemargin=0.15in
+\evensidemargin=0.15in
+\topmargin=-.5in
+\textheight=9in
+\textwidth=6.25in
+
+\setlength{\oddsidemargin}{.25in}
+\setlength{\evensidemargin}{.25in}
+\setlength{\textwidth}{6in}
+\setlength{\topmargin}{-0.4in}
+\setlength{\textheight}{8.5in}
+
+\newcommand{\handout}[5]{
+	\noindent
+	\begin{center}
+		\framebox{
+			\vbox{
+				\hbox to 5.78in { {\bf #1}
+					\hfill #2 }
+				\vspace{4mm}
+				\hbox to 5.78in { {\Large \hfill #5  \hfill} }
+				\vspace{2mm}
+				\hbox to 5.78in { {\it #3 \hfill #4} }
+			}
+		}
+	\end{center}
+	\vspace*{4mm}
+}
+
+\newcommand{\header}[3]{\handout{NUS CS-3235: Computer Security}{\today}{Lecturer: Reza Shokri}{Student: #2\quad#3}{#1}}
+
+%======================================
+%======================================
+%======================================
+
+\begin{document}
+
+% Indicate your name and your student number here (e.g., A01xxx)
+\header{Assignment 2 Report}{Luca KRUEGER}{A0209176B}
+
+
+%======================================
+\section{Buffer Overflow}
+
+%Your report should include screenshots wherever you feel it is needed for better explanations similar to the tutorial notes. When you use addresses in your payloads explain how you found them.
+The upper limit of the \texttt{for} loop in function \texttt{bof} of \texttt{buffer\_overflow.c} can be set to a maximum value of $128$ if the program was able to read $64B$ from each of the two input files. The iterator of the loop is used to access the buffer \texttt{buf}, which is defined as char array of size $64$.
+Hence, the loop can be exploited to overflow the buffer and to overwrite the stack. This can will be used to change the functions return pointer to an executable shellcode, which will be inserted into the buffer. 
+
+When overwriting the stack, other variables such as the iterator \texttt{idx} and the upper limit of the loop \texttt{byte\_read1 + byte\_read2} will also be overwritten. To avoid a unwanted termination of the program due to changed iterators of the loop, one need to know precisely where these variable are stored in the stack, and which values the hold at the moment of overwriting.
+For this exercise, the address randomization ASLR is deactivated.
+
+I used the tool \texttt{gdb} to observe the variables addresses and its relative positions to the buffer \texttt{buf}. The command \texttt{p \&byte\_read2} for example returns the address of the variable \texttt{byte\_read2} on the stack after entering the gdb environment through \texttt{gdb ./buffer\_overflow exploit1 exploit2}.
+
+The following mapping can be observed: (Table \ref{stack})
+
+\begin{table}[H]
+	\begin{tabular}{c|cccc}
+		\textbf{Variable} & \textbf{Address} & \textbf{Length} & \textbf{Index \textit{(rel. to buf)}} & \textbf{Preferred value} \\
+		\hline
+		\texttt{buf[0]} & \texttt{0x7fffffffe190} & $1B$ & $0$ & \multirow{2}{*}{shellcode}\\
+		\texttt{buf[63]} & \texttt{0x7fffffffe1cf} & $1B$ & $63$ & \\
+		\texttt{byte\_read2} & \texttt{0x7fffffffe1e4} & $4B$ & $84-87$ &$40_h = 64$ \\
+		\texttt{byte\_read1} & \texttt{0x7fffffffe1e8} & $4B$ & $88-91$ &$40_h = 64$ \\
+		\texttt{idx} & \texttt{0x7fffffffe1ec} & $4B$ & $92-95$ & 92\\
+		\texttt{idx2} & \texttt{0x7fffffffe1dc} & $4B$ & $76-79$ & don't care\\
+		\texttt{idx1} & \texttt{0x7fffffffe1e0} & $4B$ & $80-83$ & don't care\\
+		\texttt{return} & \texttt{0x7fffffffe1f8} & $8B$ & $104-111$ & \texttt{0x7fffffffe210} \\
+	\end{tabular}
+	\caption{Variable locations on the stack}
+	\label{stack}
+\end{table}
+
+This knowledge can be used to generate the input files accordingly to overwrite the variables and the return pointer correctly. 
+Unfortunately the input files are not directly fed into the buffer. The program alternates between the to inputs such that for even \texttt{idx} input file 1 is used and for uneven \texttt{idx} input file 2.
+I came up with a short python script \texttt{buf\_gen.py}, which generates a string, a concatination of the preferred variable values, and which then writes this string in the same alternating manner into the two files.
+
+
+%======================================
+
+\newpage
+\section{Format String Attack}
+
+
+
+
+
+%======================================
+
+\newpage
+\section{Return-oriented Programming}
+
+
+
+\end{document}
