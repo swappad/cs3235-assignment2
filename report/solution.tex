@@ -119,10 +119,13 @@ The string above will be interpreted as follows:
 \section{Return-oriented Programming}
 The function \texttt{rop} inside \texttt{rop.c} checks input values to be smaller than $24$ to avoid a buffer overflow. The user input is written into a \texttt{signed long}, checked for the condition and later casted to a \texttt{unsigned long} namely \texttt{size\_t}. The casted value \texttt{read\_size} tells the \texttt{read} the amount of characters to be read. Therefore, a user can enter a value $x<0$ to pass the condition $x<24$, but cause the function to read $|x|>>24$ characters which will overflow the  buffer.
 By overflowing the buffer, return addresses can be overwritten to point to other instructions within the execution space.
+
 I used a python script \texttt{sample.py} to generate the input file \texttt{exploit}.
 The first $24$ characters are needed to fill the buffer, after this the function return pointer can be overwritten.
-E.g. adding the pointer \texttt{0x7ffff7a27120} to the \texttt{exit()} system call, causes the program to exit.
-Opening a file unfortunately brought the program into a loop, restarting from the beginning. 
+Starting from this return call, other instractions can be chained together by adding pointers to them on the stack. 
+The only constraint to these instructions is, that they have to return to the next entry on the stack to infer the next instruction.
+The program which will be executed after entering the return, reads a filename from \texttt{stdin}, write to the file and closes it.
+The user input must not exceed a total length of $8\si{\byte}$ and must be terminated with a zero byte. This can be generated depending on the terminal used, using the shortcut \texttt{Ctrl+@}.
 
 
 \end{document}
