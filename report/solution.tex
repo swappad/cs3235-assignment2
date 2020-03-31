@@ -1,0 +1,128 @@
+\documentclass[12pt]{article}
+\renewcommand{\baselinestretch}{1.5}
+\usepackage[OT4]{fontenc}
+\newtheorem{define}{Definition}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage{multirow}
+\usepackage{listings}
+\usepackage[binary-units=true]{siunitx}
+
+\oddsidemargin=0.15in
+\evensidemargin=0.15in
+\topmargin=-.5in
+\textheight=9in
+\textwidth=6.25in
+
+\setlength{\oddsidemargin}{.25in}
+\setlength{\evensidemargin}{.25in}
+\setlength{\textwidth}{6in}
+\setlength{\topmargin}{-0.4in}
+\setlength{\textheight}{8.5in}
+
+\newcommand{\handout}[5]{
+	\noindent
+	\begin{center}
+		\framebox{
+			\vbox{
+				\hbox to 5.78in { {\bf #1}
+					\hfill #2 }
+				\vspace{4mm}
+				\hbox to 5.78in { {\Large \hfill #5  \hfill} }
+				\vspace{2mm}
+				\hbox to 5.78in { {\it #3 \hfill #4} }
+			}
+		}
+	\end{center}
+	\vspace*{4mm}
+}
+
+\newcommand{\header}[3]{\handout{NUS CS-3235: Computer Security}{\today}{Lecturer: Reza Shokri}{Student: #2\quad#3}{#1}}
+\lstset{
+	language=bash,
+	basicstyle=\ttfamily \small\
+}
+
+%======================================
+%======================================
+%======================================
+
+\begin{document}
+
+% Indicate your name and your student number here (e.g., A01xxx)
+\header{Assignment 2 Report}{Luca KRUEGER}{A0209176B}
+
+
+%======================================
+\section{Buffer Overflow}
+
+%Your report should include screenshots wherever you feel it is needed for better explanations similar to the tutorial notes. When you use addresses in your payloads explain how you found them.
+The upper limit of the \texttt{for} loop in function \texttt{bof} of \texttt{buffer\_overflow.c} can be set to a maximum value of $128$ if the program was able to read $64B$ from each of the two input files. The iterator of the loop is used to access the buffer \texttt{buf}, which is defined as char array of size $64$.
+Hence, the loop can be exploited to overflow the buffer and to overwrite the stack. This will be used to change the functions return pointer to an executable shellcode, which will be inserted into the buffer. 
+
+When overwriting the stack, other variables such as the iterator \texttt{idx} and the upper limit of the loop \texttt{byte\_read1 + byte\_read2} will also be overwritten. To avoid a unwanted termination of the program due to changed iterators of the loop, one need to know precisely where these variable are stored in the stack and which values they hold at the moment of overwriting.
+For this exercise, the address randomization ASLR is deactivated.
+
+I used the tool \texttt{gdb} to observe the variable's addresses and its relative positions to the buffer \texttt{buf}. The command \texttt{p \&byte\_read2} for example returns the address of the variable \texttt{byte\_read2} on the stack after entering the gdb environment through \texttt{gdb ./buffer\_overflow exploit1 exploit2}.
+
+The following mapping can be observed: (Table \ref{stack})
+
+\begin{table}[H]
+	\begin{tabular}{c|cccc}
+		\textbf{Variable} & \textbf{Address} & \textbf{Length} & \textbf{Index \textit{(rel. to buf)}} & \textbf{Preferred value} \\
+		\hline
+		\texttt{buf[0]} & \texttt{0x7fffffffe190} & $1\si{\byte}$ & $0$ & \multirow{2}{*}{shellcode}\\
+		\texttt{buf[63]} & \texttt{0x7fffffffe1cf} & $1\si{\byte}$ & $63$ & \\
+		\texttt{byte\_read2} & \texttt{0x7fffffffe1e4} & $4\si{\byte}$ & $84-87$ &$40_h = 64$ \\
+		\texttt{byte\_read1} & \texttt{0x7fffffffe1e8} & $4\si{\byte}$ & $88-91$ &$40_h = 64$ \\
+		\texttt{idx} & \texttt{0x7fffffffe1ec} & $4\si{\byte}$ & $92-95$ & 92\\
+		\texttt{idx2} & \texttt{0x7fffffffe1dc} & $4\si{\byte}$ & $76-79$ & don't care\\
+		\texttt{idx1} & \texttt{0x7fffffffe1e0} & $4\si{\byte}$ & $80-83$ & don't care\\
+		\texttt{return} & \texttt{0x7fffffffe1f8} & $8\si{\byte}$ & $104-111$ & \texttt{0x7fffffffe210} \\
+	\end{tabular}
+	\caption{Variable locations on the stack}
+	\label{stack}
+\end{table}
+
+This knowledge can be used to generate the input files accordingly to overwrite the variables and the return pointer correctly. 
+Unfortunately the input files are not directly fed into the buffer. The program alternates between the two inputs such that for even \texttt{idx} input file 1 is used and for uneven \texttt{idx} input file 2.
+I came up with a short python script \texttt{buf\_gen.py}, which generates a string, a concatination of the preferred variable values, and which then writes this string in the same alternating manner into the two files.
+
+
+%======================================
+
+\newpage
+\section{Format String Attack}
+In the program \texttt{format\_string.c} line $14$ an unfiltered input string (stored in the buffer \texttt{buf}) is used as first argument for the format string function \texttt{printf()}.
+Therefore, if the buffer respectively the input string contains of format string modifiers such as \texttt{\%n, \%p, \dots} the function will search for more arguments stored in the registers (argument $0-7$) and on the stack (argument $7-n$) and format them as specified. 
+
+The input string will be generated and stored in a file by a single command such as:
+\begin{lstlisting}
+echo -ne '%4919c%8$nAAAAAA\x1c\x50\x75\x55\x55\x55\x00\x00' > payload
+\end{lstlisting}
+The string above will be interpreted as follows:
+\begin{itemize}
+	\item[\texttt{\%4919c\%} :] prints $4919 = 0x1337$ characters to \texttt{stdout}, used to set the internal output counter to this value.
+	\item[\texttt{\%8\$n} :] accesses the 8th argument with respect to the printf and write the number of bytes already printed to the adress provided.
+	\item[\texttt{AAAAAA} :] padding A's to align the following pointer address to a $8\si{\byte}$ stack entry
+	\item[Rest:] address of \texttt{jackpot} in little endian byte order
+\end{itemize}
+
+
+
+
+%======================================
+
+\newpage
+\section{Return-oriented Programming}
+The function \texttt{rop} inside \texttt{rop.c} checks input values to be smaller than $24$ to avoid a buffer overflow. The user input is written into a \texttt{signed long}, checked for the condition and later casted to a \texttt{unsigned long} namely \texttt{size\_t}. The casted value \texttt{read\_size} tells the \texttt{read} the amount of characters to be read. Therefore, a user can enter a value $x<0$ to pass the condition $x<24$, but cause the function to read $|x|>>24$ characters which will overflow the  buffer.
+By overflowing the buffer, return addresses can be overwritten to point to other instructions within the execution space.
+I used a python script \texttt{sample.py} to generate the input file \texttt{exploit}.
+The first $24$ characters are needed to fill the buffer, after this the function return pointer can be overwritten.
+E.g. adding the pointer \texttt{0x7ffff7a27120} to the \texttt{exit()} system call, causes the program to exit.
+Opening a file unfortunately brought the program into a loop, restarting from the beginning. 
+
+
+\end{document}
